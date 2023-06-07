@@ -136,6 +136,9 @@ extern "C" {
     // Returns system information string.
     RWKV_API const char * rwkv_get_system_info_string(void);
 
+    RWKV_API size_t rwkv_vocab_v20230424_encode(const char * data, const size_t len, uint32_t * out, const size_t out_len);
+    RWKV_API size_t rwkv_vocab_v20230424_decode(const uint32_t * tokens, const size_t len, char * out, const size_t out_len);
+
 #ifdef __cplusplus
 }
 #endif

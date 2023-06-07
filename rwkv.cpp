@@ -1307,3 +1307,80 @@ const char * rwkv_get_system_info_string(void) {
 
     return s.c_str();
 }
+
+#include "rwkv_vocab_v20230424.h"
+#include "rwkv_vocab_v20230424_accel.h"
+
+size_t rwkv_vocab_v20230424_encode(const char * data, const size_t len, uint32_t * out, const size_t out_len) {
+    size_t count = 0;
+    uint32_t last_token = 0;
+
+    for (size_t start = 0; start < len;) {
+        const struct rwkv_vocab_v20230424_accel_entry * last = &rwkv_vocab_v20230424_accel;
+
+        for (size_t i = start; i < len; i++) {
+            const uint8_t byte = ((const uint8_t *) data)[i];
+            bool found2 = false;
+
+            for (size_t c = 0; c < last->num_children; c++) {
+                if (last->children[c].byte == byte) {
+                    found2 = true;
+                    last = &last->children[c];
+
+                    if (last->token > 0) {
+                        last_token = last->token;
+                        start = i + 1;
+                    }
+
+                    break;
+                }
+            }
+
+            if (!found2) {
+                break;
+            }
+        }
+
+        if (last_token) {
+            if (out) {
+                if (count < out_len) {
+                    out[count] = last_token;
+                } else {
+                    return count;
+                }
+            }
+
+            count++;
+            last_token = 0;
+        } else {
+            break;
+        }
+    }
+
+    return count;
+}
+
+size_t rwkv_vocab_v20230424_decode(const uint32_t * tokens, const size_t len, char * out, const size_t out_len) {
+    size_t count = 0;
+
+    for (size_t i = 0; i < len; i++) {
+        const uint32_t token = tokens[i];
+
+        if (token < sizeof(rwkv_vocab_v20230424) / sizeof(rwkv_vocab_v20230424_entry)) {
+            const struct rwkv_vocab_v20230424_entry * entry = &rwkv_vocab_v20230424[token];
+
+            if (out) {
+                if (count + entry->len <= out_len) {
+                    memcpy(&out[count], entry->bytes, entry->len);
+                } else {
+                    memcpy(&out[count], entry->bytes, out_len - count);
+                    return out_len;
+                }
+            }
+
+            count += entry->len;
+        }
+    }
+
+    return count;
+}
