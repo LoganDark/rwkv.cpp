@@ -1427,7 +1427,7 @@ void rwkv_temper(const float * probs, const size_t n_vocab, const float temperat
     }
 }
 
-uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p) {
+uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p, uint32_t * top) {
     if (top_k == 0) {
         return 0;
     } else if (top_k == 1) {
@@ -1444,7 +1444,11 @@ uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top
         return choice;
     }
 
-    std::unique_ptr<uint32_t []> top(new(std::nothrow) uint32_t [n_vocab]);
+    std::unique_ptr<uint32_t []> top_;
+
+    if (!top) {
+        top_.reset(top = new(std::nothrow) uint32_t [n_vocab]);
+    }
 
     if (!top) {
         return 0;
@@ -1454,7 +1458,7 @@ uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top
         top[token] = token;
     }
 
-    std::stable_sort(top.get(), top.get() + n_vocab, [probs](const uint32_t a, const uint32_t b) {
+    std::stable_sort(top, top + n_vocab, [probs](const uint32_t a, const uint32_t b) {
         return probs[a] > probs[b];
     });
 

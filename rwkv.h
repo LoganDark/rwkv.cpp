@@ -141,7 +141,7 @@ extern "C" {
 
     RWKV_API void rwkv_softmax(const float * logits, const size_t n_vocab, float * probs);
     RWKV_API void rwkv_temper(const float * probs, const size_t n_vocab, const float temperature, float * out);
-    RWKV_API uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p);
+    RWKV_API uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p, uint32_t * top);
 
 #ifdef __cplusplus
 }

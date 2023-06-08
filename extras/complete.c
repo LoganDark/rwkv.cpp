@@ -25,6 +25,7 @@ int main() {
 	float * state = calloc(rwkv_get_state_buffer_element_count(ctx), sizeof(float));
 	const size_t n_vocab = rwkv_get_logits_buffer_element_count(ctx);
 	float * logits = calloc(n_vocab, sizeof(float));
+	uint32_t * top = calloc(n_vocab, sizeof(uint32_t));
 
 	char decode_buf[128];
 	for (size_t i = 0; i < max_tokens; i++) {
@@ -32,7 +33,7 @@ int main() {
 
 		if (i < prompt_tokens) {
 			token = tokens[i];
-		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75)) {
+		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, top)) {
 			tokens[i] = token;
 		} else {
 			break;
