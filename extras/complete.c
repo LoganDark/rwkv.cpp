@@ -46,6 +46,7 @@ int main() {
 		rwkv_temper(logits, n_vocab, 1.0, logits);
 	}
 
+	free(top);
 	free(logits);
 	free(state);
 	free(tokens);
