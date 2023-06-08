@@ -32,7 +32,7 @@ int main() {
 
 		if (i < prompt_tokens) {
 			token = tokens[i];
-		} else if (token = rwkv_sample(logits, n_vocab, 25, 0.75, 1.0)) {
+		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, 1.0)) {
 			tokens[i] = token;
 		} else {
 			break;
@@ -41,6 +41,7 @@ int main() {
 		const size_t decode_len = rwkv_vocab_v20230424_decode(&token, 1, decode_buf, 128);
 		printf("%.*s", (unsigned) decode_len, decode_buf);
 		rwkv_eval(ctx, token, i == 0 ? NULL : state, state, logits);
+		rwkv_softmax(logits, n_vocab, logits);
 	}
 
 	free(logits);
