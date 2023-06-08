@@ -12,10 +12,10 @@ int main() {
 	system("chcp 65001 >nul");
 #endif
 
-	struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-World-0.1B-v1-20230520-ctx4096-f32.bin", 6);
+	struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-World-1.5B-v1-20230607-ctx4096-Q8_0.bin", 6);
 	rwkv_gpu_offload_layers(ctx, 40);
 
-	const char prompt[] = "A raven is a species of";
+	const char prompt[] = "The common raven is a large all-black passerine bird. It is the most widely distributed of all corvids, found across the Northern Hemisphere.";
 	const size_t prompt_len = sizeof(prompt) - 1;
 
 	const size_t max_tokens = 256;
@@ -32,7 +32,7 @@ int main() {
 
 		if (i < prompt_tokens) {
 			token = tokens[i];
-		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, 1.1)) {
+		} else if (token = rwkv_sample(logits, n_vocab, 25, 0.75, 1.0)) {
 			tokens[i] = token;
 		} else {
 			break;
