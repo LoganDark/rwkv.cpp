@@ -13,6 +13,8 @@
 #include <fstream>
 #include <unordered_map>
 #include <memory>
+#include <algorithm>
+#include <random>
 
 #define _FILE_OFFSET_BITS 64
 #define RWKV_MAYBE_BREAK
@@ -1383,4 +1385,103 @@ size_t rwkv_vocab_v20230424_decode(const uint32_t * tokens, const size_t len, ch
     }
 
     return count;
+}
+
+// https://codereview.stackexchange.com/a/180527
+void rwkv_softmax(const float * logits, const size_t n_vocab, float * output) {
+    float max = -INFINITY;
+    for (size_t i = 0; i < n_vocab; i++) {
+        max = std::max(max, logits[i]);
+    }
+
+    float sum = 0.0;
+    for (size_t i = 0; i < n_vocab; i++) {
+        sum += expf(logits[i] - max);
+    }
+
+    float offset = max + logf(sum);
+    for (size_t i = 0; i < n_vocab; i++) {
+        output[i] = expf(logits[i] - offset);
+    }
+}
+
+uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, const float top_p, const float temperature) {
+    rwkv_softmax(logits, n_vocab, logits);
+
+    if (temperature != 1.0) {
+        float sum = 0.0;
+        float exp = 1.0 / temperature;
+        for (size_t i = 0; i < n_vocab; i++) {
+            sum += logits[i] = powf(logits[i], exp);
+        }
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            logits[i] /= sum;
+        }
+    }
+
+    if (top_k == 0) {
+        return 0;
+    } else if (top_k == 1 || temperature == 0.0) {
+        float max_prob = 0.0;
+        uint32_t token = 0;
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            if (logits[i] > max_prob) {
+                max_prob = logits[i];
+                token = (uint32_t) i;
+            }
+        }
+
+        return token;
+    }
+
+    float prob_threshold = 1.0;
+    size_t tokens_included = 0;
+    float prob_included = 0.0;
+
+    while (tokens_included < top_k && prob_included < top_p) {
+        float prob_max_below_threshold = 0.0;
+        for (size_t i = 0; i < n_vocab; i++) {
+            if (logits[i] < prob_threshold && logits[i] > prob_max_below_threshold) {
+                prob_max_below_threshold = logits[i];
+            }
+        }
+
+        prob_threshold = prob_max_below_threshold;
+        tokens_included = 0;
+        prob_included = 0;
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            if (logits[i] >= prob_threshold) {
+                tokens_included++;
+                prob_included += logits[i];
+
+                if (tokens_included >= top_k) {
+                    break;
+                }
+            }
+        }
+    }
+
+    double pick; {
+        std::random_device random;
+        std::mt19937 gen(random());
+        std::uniform_real_distribution<double> dis(0.0, prob_included);
+        pick = dis(gen);
+    }
+
+    for (size_t i = 0; i < n_vocab; i++) {
+        if (logits[i] >= prob_threshold) {
+            prob_included -= logits[i];
+
+            if (prob_included <= pick) {
+                return (uint32_t) i;
+            } else if (--tokens_included == 0) {
+                break;
+            }
+        }
+    }
+
+    return 0;
 }

@@ -139,6 +139,8 @@ extern "C" {
     RWKV_API size_t rwkv_vocab_v20230424_encode(const char * data, const size_t len, uint32_t * out, const size_t out_len);
     RWKV_API size_t rwkv_vocab_v20230424_decode(const uint32_t * tokens, const size_t len, char * out, const size_t out_len);
 
+    RWKV_API uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, const float top_p, const float temperature);
+
 #ifdef __cplusplus
 }
 #endif
