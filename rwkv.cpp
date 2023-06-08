@@ -1410,7 +1410,7 @@ uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, c
 
     if (temperature != 1.0) {
         float sum = 0.0;
-        float exp = 1.0 / temperature;
+        float exp = temperature > 0.0 ? 1.0 / temperature : 1.0;
         for (size_t i = 0; i < n_vocab; i++) {
             sum += logits[i] = powf(logits[i], exp);
         }
