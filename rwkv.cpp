@@ -1428,39 +1428,42 @@ void rwkv_temper(const float * probs, const size_t n_vocab, const float temperat
 }
 
 uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p, uint32_t * top) {
-    if (top_k == 0) {
-        return 0;
-    } else if (top_k == 1) {
-        float max_prob = 0.0;
-        uint32_t choice = 0;
+    std::unique_ptr<uint32_t []> _(!top && top_k > 1 ? top = new(std::nothrow) uint32_t [n_vocab] : NULL);
 
+    if (!top && top_k > 1) {
+        return 0;
+    }
+
+    if (top) {
         for (uint32_t token = 0; token < n_vocab; token++) {
-            if (probs[token] > max_prob) {
-                max_prob = probs[token];
-                choice = token;
-            }
+            top[token] = token;
         }
 
-        return choice;
+        std::stable_sort(top, top + n_vocab, [probs](const uint32_t a, const uint32_t b) {
+            return probs[a] > probs[b];
+        });
     }
 
-    std::unique_ptr<uint32_t []> top_;
-
-    if (!top) {
-        top_.reset(top = new(std::nothrow) uint32_t [n_vocab]);
-    }
-
-    if (!top) {
+    if (top_k == 0 || n_vocab == 0) {
         return 0;
-    }
+    } else if (top_k == 1) {
+        if (top) {
+            return top[0];
+        } else {
+            float prob_max = 0.0;
+            uint32_t choice = 0;
 
-    for (uint32_t token = 0; token < n_vocab; token++) {
-        top[token] = token;
-    }
+            for (size_t i = 0; i < n_vocab; i++) {
+                const float prob = probs[i];
+                if (prob > prob_max) {
+                    prob_max = prob;
+                    choice = (uint32_t) i;
+                }
+            }
 
-    std::stable_sort(top, top + n_vocab, [probs](const uint32_t a, const uint32_t b) {
-        return probs[a] > probs[b];
-    });
+            return choice;
+        }
+    }
 
     float prob_included = 0.0;
     for (size_t i = 0; i < top_k && prob_included < top_p; i++) {
