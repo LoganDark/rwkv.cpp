@@ -1424,6 +1424,21 @@ void rwkv_temper(const float * probs, const size_t n_vocab, const float temperat
         for (size_t i = 0; i < n_vocab; i++) {
             out[i] /= sum;
         }
+    } else {
+        float prob_max = 0.0;
+        size_t choice = 0;
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            const float prob = probs[i];
+            if (prob > prob_max) {
+                out[choice] = 0.0;
+                out[i] = 1.0;
+                prob_max = prob;
+                choice = i;
+            } else {
+                out[i] = 0.0;
+            }
+        }
     }
 }
 
