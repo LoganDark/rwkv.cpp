@@ -18,7 +18,7 @@ int main() {
 	const char prompt[] = "The common raven is a large all-black passerine bird. It is the most widely distributed of all corvids, found across the Northern Hemisphere.";
 	const size_t prompt_len = sizeof(prompt) - 1;
 
-	const size_t max_tokens = 256;
+	const size_t max_tokens = 1024;
 	uint32_t * tokens = calloc(max_tokens, sizeof(uint32_t));
 	const size_t prompt_tokens = rwkv_vocab_v20230424_encode(prompt, prompt_len, tokens, max_tokens);
 
@@ -32,7 +32,7 @@ int main() {
 
 		if (i < prompt_tokens) {
 			token = tokens[i];
-		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, 1.0)) {
+		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75)) {
 			tokens[i] = token;
 		} else {
 			break;
@@ -42,6 +42,7 @@ int main() {
 		printf("%.*s", (unsigned) decode_len, decode_buf);
 		rwkv_eval(ctx, token, i == 0 ? NULL : state, state, logits);
 		rwkv_softmax(logits, n_vocab, logits);
+		rwkv_temper(logits, n_vocab, 1.0, logits);
 	}
 
 	free(logits);

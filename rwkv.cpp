@@ -1405,27 +1405,38 @@ void rwkv_softmax(const float * logits, const size_t n_vocab, float * output) {
     }
 }
 
-uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, const float top_p, const float temperature) {
-    if (temperature > 0 && temperature != 1.0) {
+void rwkv_temper(const float * probs, const size_t n_vocab, const float temperature, float * out) {
+    if (temperature == 1.0) {
         float sum = 0.0;
         for (size_t i = 0; i < n_vocab; i++) {
-            sum += logits[i] = powf(logits[i], 1.0 / temperature);
+            sum += probs[i];
         }
 
         for (size_t i = 0; i < n_vocab; i++) {
-            logits[i] /= sum;
+            out[i] /= sum;
+        }
+    } else if (temperature > 0) {
+        float sum = 0.0;
+        for (size_t i = 0; i < n_vocab; i++) {
+            sum += out[i] = powf(probs[i], 1.0 / temperature);
+        }
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            out[i] /= sum;
         }
     }
+}
 
+uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p) {
     if (top_k == 0) {
         return 0;
-    } else if (top_k == 1 || temperature == 0.0) {
+    } else if (top_k == 1) {
         float max_prob = 0.0;
         uint32_t choice = 0;
 
         for (uint32_t token = 0; token < n_vocab; token++) {
-            if (logits[token] > max_prob) {
-                max_prob = logits[token];
+            if (probs[token] > max_prob) {
+                max_prob = probs[token];
                 choice = token;
             }
         }
@@ -1443,14 +1454,14 @@ uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, c
         top[token] = token;
     }
 
-    std::stable_sort(top.get(), top.get() + n_vocab, [logits](const uint32_t a, const uint32_t b) {
-        return logits[a] > logits[b];
+    std::stable_sort(top.get(), top.get() + n_vocab, [probs](const uint32_t a, const uint32_t b) {
+        return probs[a] > probs[b];
     });
 
     float prob_included = 0.0;
     for (size_t i = 0; i < top_k && prob_included < top_p; i++) {
         const uint32_t token = top[i];
-        const float prob = logits[token];
+        const float prob = probs[token];
         prob_included += prob;
     }
 
@@ -1463,7 +1474,7 @@ uint32_t rwkv_sample(float * logits, const size_t n_vocab, const size_t top_k, c
 
     for (size_t i = 0; i < top_k; i++) {
         const uint32_t token = top[i];
-        if ((prob_included -= logits[token]) <= pick) {
+        if ((prob_included -= probs[token]) <= pick) {
             return token;
         }
     }
