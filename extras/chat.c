@@ -73,9 +73,9 @@ int main() {
 	time_measure(start);
 
 	size_t state_count = 0;
-	float * state = calloc(rwkv_get_state_buffer_element_count(ctx), sizeof(float));
-	const size_t n_vocab = rwkv_get_logits_buffer_element_count(ctx);
-	float * logits = calloc(n_vocab, sizeof(float));
+	float * state = calloc(rwkv_get_state_len(ctx), sizeof(float));
+	float * logits = calloc(rwkv_get_logits_len(ctx), sizeof(float));
+	const size_t n_vocab = rwkv_get_n_vocab(ctx);
 	uint32_t * top = calloc(n_vocab, sizeof(uint32_t));
 	char decode_buf[128];
 
