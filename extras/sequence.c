@@ -34,7 +34,7 @@ int main() {
     time_t start_load, end_load;
     fprintf(stderr, "Load model ...");
     time_measure(start_load);
-    struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-World-0.1B-v1-20230520-ctx4096-f32.bin", 6);
+    struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-Raven-1B5-v12-Eng98-20230520-ctx4096-f32.bin", 6);
     time_measure(end_load);
     fprintf(stderr, " %.3fs\n", TIME_DIFF(freq, start_load, end_load));
 
