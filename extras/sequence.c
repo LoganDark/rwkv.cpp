@@ -45,7 +45,7 @@ int main() {
     time_measure(end_offload);
     fprintf(stderr, " %.3fs\n", TIME_DIFF(freq, start_offload, end_offload));
 
-    const uint32_t tokens[4] = { 0 };
+    const uint32_t tokens[64] = { 0 };
     const uint32_t num_tokens = sizeof(tokens) / sizeof(*tokens);
 
     size_t state_nelems = rwkv_get_state_len(ctx);
@@ -76,6 +76,8 @@ int main() {
     fprintf(stderr, " 1 = %.3fs ...", sequence_build_diff);
     time_measure(start_seq);
     rwkv_eval_sequence(ctx, tokens, num_tokens, NULL, state_seq2, logits_seq2);
+    //for (uint32_t i = 0; i < num_tokens; i++)
+    //    rwkv_eval_sequence(ctx, &tokens[i], 1, i == 0 ? NULL : state_seq2, state_seq2, logits_seq2);
     time_measure(end_seq);
     double sequence_diff = TIME_DIFF(freq, start_seq, end_seq);
     fprintf(stderr, " 2 = %.3fs\n", sequence_diff);
