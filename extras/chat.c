@@ -108,15 +108,17 @@ int main() {
 
 		char model_feed[16384];
 		const size_t model_feed_len = used_full_reverse_prompt
-			? snprintf(model_feed, 16384, " %.*s\n\n%.*s", (unsigned) user_line_len, user_line, (unsigned) model_prompt_len, model_prompt)
-			: snprintf(model_feed, 16384, "%.*s %.*s\n\n%.*s", (unsigned) user_line_len, user_prompt, (unsigned) user_line_len, user_line, (unsigned) model_prompt_len, model_prompt);
+			? snprintf(model_feed, 16384, "%.*s\n\n%.*s", (unsigned) user_line_len, user_line, (unsigned) model_prompt_len, model_prompt)
+			: snprintf(model_feed, 16384, "%.*s%.*s\n\n%.*s", (unsigned) user_prompt_len, user_prompt, (unsigned) user_line_len, user_line, (unsigned) model_prompt_len, model_prompt);
 
 		feed_model(ctx, &state_count, state, logits, model_feed, model_feed_len);
 		fprintf(stderr, "\n%.*s:", (unsigned) model_display_name_len, model_display_name);
 
 		used_full_reverse_prompt = n > 3;
-		char reverse_prompt[128] = "\n\n";
-		const size_t reverse_prompt_len = !used_full_reverse_prompt ? 2 : snprintf(reverse_prompt, 128, "\n\n%.*s", (unsigned) user_prompt_len, user_prompt);
+		char reverse_prompt[128] = { 0 };
+		const size_t reverse_prompt_len = !used_full_reverse_prompt
+			? snprintf(reverse_prompt, 128, "\n\n")
+			: snprintf(reverse_prompt, 128, "\n\n%.*s", (unsigned) user_prompt_len, user_prompt);
 		size_t reverse_prompt_progress = 0;
 
 		while (reverse_prompt_progress < reverse_prompt_len) {
