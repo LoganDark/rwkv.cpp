@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <memory>
 #include <utility>
+#include <algorithm>
+#include <random>
 
 #define _FILE_OFFSET_BITS 64
 // Puts an optional break point, if debug is enabled.
@@ -1940,4 +1942,198 @@ const char * rwkv_get_system_info_string(void) {
     s += "VSX="       + std::to_string(ggml_cpu_has_vsx());
 
     return s.c_str();
+}
+
+#include "rwkv_vocab_v20230424.h"
+#include "rwkv_vocab_v20230424_accel.h"
+
+size_t rwkv_vocab_v20230424_encode(const char * data, const size_t len, uint32_t * out, const size_t out_len) {
+    size_t count = 0;
+    uint32_t last_token = 0;
+
+    for (size_t start = 0; start < len;) {
+        const struct rwkv_vocab_v20230424_accel_entry * last = &rwkv_vocab_v20230424_accel;
+
+        for (size_t i = start; i < len; i++) {
+            const uint8_t byte = ((const uint8_t *) data)[i];
+            bool found2 = false;
+
+            for (size_t c = 0; c < last->num_children; c++) {
+                if (last->children[c].byte == byte) {
+                    found2 = true;
+                    last = &last->children[c];
+
+                    if (last->token > 0) {
+                        last_token = last->token;
+                        start = i + 1;
+                    }
+
+                    break;
+                }
+            }
+
+            if (!found2) {
+                break;
+            }
+        }
+
+        if (last_token) {
+            if (out) {
+                if (count < out_len) {
+                    out[count] = last_token;
+                } else {
+                    return count;
+                }
+            }
+
+            count++;
+            last_token = 0;
+        } else {
+            break;
+        }
+    }
+
+    return count;
+}
+
+size_t rwkv_vocab_v20230424_decode(const uint32_t * tokens, const size_t len, char * out, const size_t out_len) {
+    size_t count = 0;
+
+    for (size_t i = 0; i < len; i++) {
+        const uint32_t token = tokens[i];
+
+        if (token < sizeof(rwkv_vocab_v20230424) / sizeof(rwkv_vocab_v20230424_entry)) {
+            const struct rwkv_vocab_v20230424_entry * entry = &rwkv_vocab_v20230424[token];
+
+            if (out) {
+                if (count + entry->len <= out_len) {
+                    memcpy(&out[count], entry->bytes, entry->len);
+                } else {
+                    memcpy(&out[count], entry->bytes, out_len - count);
+                    return out_len;
+                }
+            }
+
+            count += entry->len;
+        }
+    }
+
+    return count;
+}
+
+// https://codereview.stackexchange.com/a/180527
+void rwkv_softmax(const float * logits, const size_t n_vocab, float * output) {
+    float max = -INFINITY;
+    for (size_t i = 0; i < n_vocab; i++) {
+        max = std::max(max, logits[i]);
+    }
+
+    float sum = 0.0;
+    for (size_t i = 0; i < n_vocab; i++) {
+        sum += expf(logits[i] - max);
+    }
+
+    float offset = max + logf(sum);
+    for (size_t i = 0; i < n_vocab; i++) {
+        output[i] = expf(logits[i] - offset);
+    }
+}
+
+void rwkv_temper(const float * probs, const size_t n_vocab, const float temperature, float * out) {
+    if (temperature == 1.0) {
+        float sum = 0.0;
+        for (size_t i = 0; i < n_vocab; i++) {
+            sum += probs[i];
+        }
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            out[i] /= sum;
+        }
+    } else if (temperature > 0) {
+        float sum = 0.0;
+        for (size_t i = 0; i < n_vocab; i++) {
+            sum += out[i] = powf(probs[i], 1.0 / temperature);
+        }
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            out[i] /= sum;
+        }
+    } else {
+        float prob_max = 0.0;
+        size_t choice = 0;
+
+        for (size_t i = 0; i < n_vocab; i++) {
+            const float prob = probs[i];
+            if (prob > prob_max) {
+                out[choice] = 0.0;
+                out[i] = 1.0;
+                prob_max = prob;
+                choice = i;
+            } else {
+                out[i] = 0.0;
+            }
+        }
+    }
+}
+
+uint32_t rwkv_sample(const float * probs, const size_t n_vocab, const size_t top_k, const float top_p, uint32_t * top) {
+    std::unique_ptr<uint32_t []> _(!top && top_k > 1 ? top = new(std::nothrow) uint32_t [n_vocab] : NULL);
+
+    if (!top && top_k > 1) {
+        return 0;
+    }
+
+    if (top) {
+        for (uint32_t token = 0; token < n_vocab; token++) {
+            top[token] = token;
+        }
+
+        std::stable_sort(top, top + n_vocab, [probs](const uint32_t a, const uint32_t b) {
+            return probs[a] > probs[b];
+        });
+    }
+
+    if (top_k == 0 || n_vocab == 0) {
+        return 0;
+    } else if (top_k == 1) {
+        if (top) {
+            return top[0];
+        } else {
+            float prob_max = 0.0;
+            uint32_t choice = 0;
+
+            for (size_t i = 0; i < n_vocab; i++) {
+                const float prob = probs[i];
+                if (prob > prob_max) {
+                    prob_max = prob;
+                    choice = (uint32_t) i;
+                }
+            }
+
+            return choice;
+        }
+    }
+
+    float prob_included = 0.0;
+    for (size_t i = 0; i < top_k && prob_included < top_p; i++) {
+        const uint32_t token = top[i];
+        const float prob = probs[token];
+        prob_included += prob;
+    }
+
+    double pick; {
+        std::random_device random;
+        std::mt19937 gen(random());
+        std::uniform_real_distribution<double> dis(0.0, prob_included);
+        pick = dis(gen);
+    }
+
+    for (size_t i = 0; i < top_k; i++) {
+        const uint32_t token = top[i];
+        if ((prob_included -= probs[token]) <= pick) {
+            return token;
+        }
+    }
+
+    return 0;
 }
