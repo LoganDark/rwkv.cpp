@@ -42,7 +42,7 @@ void feed_model(struct rwkv_context * ctx, size_t * state_count, float * state, 
 	}
 }
 
-int main() {
+int main(void) {
 #ifdef _WIN32
 	// enable UTF-8
 	system("chcp 65001 >nul");
@@ -59,13 +59,7 @@ int main() {
 
 	fprintf(stderr, "\nLoading model ...");
 	time_measure(start);
-	struct rwkv_context * ctx = rwkv_init_from_file(model_path, 6);
-	time_measure(end);
-	fprintf(stderr, " %.3fs\n", TIME_DIFF(freq, start, end));
-
-	fprintf(stderr, "GPU offload ...");
-	time_measure(start);
-	rwkv_gpu_offload_layers(ctx, 40);
+	struct rwkv_context * ctx = rwkv_init_from_file(model_path, 6, 40);
 	time_measure(end);
 	fprintf(stderr, " %.3fs\n", TIME_DIFF(freq, start, end));
 

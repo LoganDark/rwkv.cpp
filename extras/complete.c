@@ -6,14 +6,13 @@
 #include <inttypes.h>
 #include <string.h>
 
-int main() {
+int main(void) {
 #ifdef _WIN32
 	// enable UTF-8
 	system("chcp 65001 >nul");
 #endif
 
-	struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-World-1.5B-v1-20230607-ctx4096-Q8_0.bin", 6);
-	rwkv_gpu_offload_layers(ctx, 40);
+	struct rwkv_context * ctx = rwkv_init_from_file("C:\\Users\\LoganDark\\Documents\\RWKV\\RWKV-4-World-1.5B-v1-20230607-ctx4096-Q8_0.bin", 6, 40);
 
 	const char prompt[] = "The common raven is a large all-black passerine bird. It is the most widely distributed of all corvids, found across the Northern Hemisphere.";
 	const size_t prompt_len = sizeof(prompt) - 1;
@@ -22,8 +21,8 @@ int main() {
 	uint32_t * tokens = calloc(max_tokens, sizeof(uint32_t));
 	const size_t prompt_tokens = rwkv_vocab_v20230424_encode(prompt, prompt_len, tokens, max_tokens);
 
-	float * state = calloc(rwkv_get_state_buffer_element_count(ctx), sizeof(float));
-	const size_t n_vocab = rwkv_get_logits_buffer_element_count(ctx);
+	float * state = calloc(rwkv_get_state_len(ctx), sizeof(float));
+	const size_t n_vocab = rwkv_get_n_vocab(ctx);
 	float * logits = calloc(n_vocab, sizeof(float));
 	uint32_t * top = calloc(n_vocab, sizeof(uint32_t));
 
@@ -33,7 +32,7 @@ int main() {
 
 		if (i < prompt_tokens) {
 			token = tokens[i];
-		} else if (token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, top)) {
+		} else if ((token = rwkv_sample(logits, n_vocab, n_vocab, 0.75, top))) {
 			tokens[i] = token;
 		} else {
 			break;

@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 
-int main() {
+int main(void) {
 	const char input[] = "Hello, World!";
 	const size_t input_len = sizeof(input) / sizeof(char) - 1;
 
